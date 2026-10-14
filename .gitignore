@@ -1,0 +1,12 @@
+dist/
+tmp/
+*.srs
+*.srs.sha256
+iran-all.json
+ads-merged.json
+report.txt
+SHA256SUMS
+sing-box
+*.tgz
+*.tar.gz
+.DS_Store

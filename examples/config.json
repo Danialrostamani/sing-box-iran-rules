@@ -1,0 +1,28 @@
+{
+  "route": {
+    "rule_set": [
+      {
+        "tag": "ads-merged",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "tag": "iran-all",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      }
+    ],
+    "rules": [
+      { "action": "sniff" },
+      { "rule_set": "ads-merged", "action": "reject" },
+      { "rule_set": "iran-all", "outbound": "direct" }
+    ],
+    "final": "proxy"
+  }
+}

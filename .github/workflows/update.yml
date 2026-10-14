@@ -1,0 +1,99 @@
+name: Update rule-sets
+
+on:
+  schedule:
+    # هر دوشنبه ۰۳:۳۰ UTC ≈ ۰۷:۰۰ تهران
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "iran-one-srs.sh"
+      - ".github/workflows/update.yml"
+
+concurrency:
+  group: update-rulesets
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install sing-box
+        run: |
+          set -euo pipefail
+          VER=$(curl -fsSL https://api.github.com/repos/SagerNet/sing-box/releases/latest \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')
+          echo "sing-box $VER"
+          curl -fsSL -o /tmp/sb.tgz \
+            "https://github.com/SagerNet/sing-box/releases/download/v${VER}/sing-box-${VER}-linux-amd64.tar.gz"
+          tar -xzf /tmp/sb.tgz -C /tmp
+          sudo install -m 0755 /tmp/sing-box-*/sing-box /usr/local/bin/sing-box
+          sing-box version
+
+      - name: Build iran-all + ads-merged
+        run: |
+          set -euo pipefail
+          chmod +x iran-one-srs.sh
+          mkdir -p dist
+          ./iran-one-srs.sh --yes --report -d dist
+          test -f dist/iran-all.srs
+          test -f dist/ads-merged.srs
+          cd dist
+          sha256sum iran-all.srs ads-merged.srs iran-all.json ads-merged.json | tee SHA256SUMS
+          ls -lh
+
+      - name: Publish files to release branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG=$(date -u +%Y%m%d)
+          DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "DATE=$DATE" >> "$GITHUB_ENV"
+          cd dist
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan release
+          git add iran-all.srs ads-merged.srs iran-all.json ads-merged.json report.txt SHA256SUMS
+          git commit -m "update rule-sets ${TAG}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git push -f origin release
+
+      - name: Purge jsDelivr cache
+        continue-on-error: true
+        run: |
+          for f in iran-all.srs ads-merged.srs iran-all.json ads-merged.json report.txt SHA256SUMS; do
+            curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release/${f}" || true
+          done
+
+      - name: GitHub Release (replaces latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NOTES="به‌روزرسانی خودکار ${DATE}
+
+          | فایل | کاربرد |
+          |---|---|
+          | \`iran-all.srs\` | دایرکت ایران (دامنه + IP) |
+          | \`ads-merged.srs\` | مسدودسازی تبلیغات، ردیاب، بدافزار، فیشینگ |
+
+          ترتیب رول در sing-box: **اول ads-merged، بعد iran-all**."
+          gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" \
+            dist/iran-all.srs dist/ads-merged.srs \
+            dist/iran-all.json dist/ads-merged.json \
+            dist/report.txt dist/SHA256SUMS \
+            --title "Rule-sets $TAG" \
+            --notes "$NOTES" \
+            --latest
