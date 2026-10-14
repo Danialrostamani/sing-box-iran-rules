@@ -9,7 +9,7 @@
 | [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) | geoip/geosite ایران | GPL-3.0 |
 | [bootmortis/iran-hosted-domains](https://github.com/bootmortis/iran-hosted-domains) | دامنه‌های میزبانی‌شده در ایران + لیست تبلیغات | MIT |
 | [Loyalsoldier/geoip](https://github.com/Loyalsoldier/geoip) | رنج IP ایران | CC-BY-SA-4.0 |
-| [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists) | تبلیغات / تهدید (Pro, TIF) | GPL-3.0 |
+| [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists) | تبلیغات (Pro mini / popupads) + تهدید (TIF / Fake) | GPL-3.0 |
 | [MasterKia/PersianBlocker](https://github.com/MasterKia/PersianBlocker) | تبلیغات و ردیاب ایرانی | GPL-3.0 |
 | [Public Suffix List](https://publicsuffix.org/) | جلوگیری از ورود پسوندهای عمومی به لیست دایرکت | MPL-2.0 |
 

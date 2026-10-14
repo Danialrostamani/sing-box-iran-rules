@@ -98,8 +98,10 @@
 | سطح | پوشش |
 |---|---|
 | `lite` | تبلیغات/ردیاب ایرانی + malware/phishing/cryptominers + HaGeZi Light |
-| `normal` | lite + HaGeZi Pro-mini + HaGeZi TIF-mini |
-| `full` | HaGeZi Pro + TIF-medium + category-ads-all |
+| `normal` | lite + HaGeZi Pro-mini + popupads + Fake + TIF-mini + Chocolate4U `@ads` و `category-ads` |
+| `full` | HaGeZi Pro + popupads + Fake + TIF-medium + category-ads-all |
+
+دامنه‌های ضروری مثل `googletagmanager.com`، `graph.instagram.com` و دامنهٔ اصلی گوگل/اینستاگرام/گیت‌هاب **مسدود نمی‌شوند** تا سایت‌ها نشکند. ردیاب‌هایی مثل Lucky Orange، FullStory، Hotjar، Clarity مسدودند.
 
 حفاظت: دامنهٔ اصلی سایت‌های ایرانی توسط لیست تبلیغاتی عمومی مسدود نمی‌شود. لیست تهدید (TIF / malware / phishing) اولویت دارد، مگر بانک / پرداخت / دولت / بورس / بیمه.
 

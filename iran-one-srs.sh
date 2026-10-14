@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  iran-one-srs.sh  v2.2  —  ساخت دو فایل srs برای sing-box
+#  iran-one-srs.sh  v2.3  —  ساخت دو فایل srs برای sing-box
 #  ----------------------------------------------------------------------------
 #    iran-all.srs   ← سایت‌ها و IPهای ایرانی که باید «direct» شوند (با بررسی دقیق)
 #    ads-merged.srs  ← تبلیغات، ردیاب، بدافزار، فیشینگ، ماینر  (برای «reject»)
@@ -23,10 +23,12 @@
 #  │      حذف می‌شود — این گزینه را داخل ایران اجرا کنید                   │
 #  └───────────────────────────────────────────────────────────────────────┘
 #  ┌─ ads-merged.srs (reject) ──────────────────────────────────────────────────┐
-#  │ lite  : تبلیغات/ردیاب ایرانی (Chocolate4U, bootmortis, PersianBlocker)│
-#  │         + malware/phishing/cryptominers + HaGeZi Light                 │
-#  │ normal: lite ولی HaGeZi Pro-mini + HaGeZi TIF-mini (تهدیدها)  [پیش‌فرض]│
-#  │ full  : lite ولی HaGeZi Pro + HaGeZi TIF-medium + category-ads-all     │
+#  │ lite  : تبلیغات/ردیاب ایرانی + malware/phishing/cryptominers          │
+#  │         + HaGeZi Light                                                │
+#  │ normal: lite + HaGeZi Pro-mini + popupads + Fake + TIF-mini           │
+#  │         + Chocolate4U google/facebook/amazon/apple/microsoft/yandex@ads│
+#  │         + category-ads   [پیش‌فرض GitHub Actions]                     │
+#  │ full  : HaGeZi Pro + popupads + Fake + TIF-medium + category-ads-all  │
 #  │ محافظت: دامنهٔ اصلی سایت‌های ایرانی (category-*-ir) توسط لیست‌های     │
 #  │   تبلیغاتی عمومی مسدود نمی‌شود (HaGeZi مثلاً mcinext.com و mihanblog را │
 #  │   دارد). لیست‌های تهدید (TIF، malware، phishing) اولویت دارند، مگر     │
@@ -57,7 +59,7 @@
 # ============================================================================
 
 set -uo pipefail
-VERSION="2.2.0"
+VERSION="2.3.0"
 
 MODE="all"
 OUT_DIR="."
@@ -107,11 +109,33 @@ DENY_DIRECT=(co.com dyndns.org selfip.com ddnsguru.com sells-it.net epizy.com we
 # همیشه direct بمانند (حتی اگر در لیست تبلیغات/خارجی باشند)
 KEEP_DIRECT=(zarin.link sabaidea.cloud liara.run)
 
+# دامنه‌هایی که هرگز reject نمی‌شوند (سایت را نمی‌شکنند).
+# NEVER_BLOCK: خودش و زیردامنه‌ها.  NEVER_BLOCK_EXACT: فقط همان دامنه (نه ads.google.com).
+NEVER_BLOCK=(
+  googletagmanager.com        # خیلی از سایت‌ها به GTM وابسته‌اند
+  googletagmanager-cn.com
+  graph.instagram.com         # API اینستاگرام
+  graph-fallback.instagram.com
+  tracker.gg                  # سایت آمار بازی، ردیاب تبلیغاتی نیست
+)
+NEVER_BLOCK_EXACT=(
+  google.com youtube.com gmail.com wikipedia.org wikimedia.org
+  facebook.com instagram.com whatsapp.com messenger.com
+  github.com cloudflare.com apple.com microsoft.com amazon.com
+  telegram.org twitter.com tiktok.com netflix.com spotify.com
+)
+
 # --- block: دامنه‌های دستی که «همیشه» مسدود می‌شوند (بالاترین اولویت) ---
 # هر دامنه‌ای اضافه کنید، خودش و همهٔ زیردامنه‌هایش مسدود می‌شود.
 EXTRA_BLOCK=(
   ad.doubleclick.net          # تبلیغات گوگل (HaGeZi عمداً آزادش گذاشته)
   adservice.google.com        # تبلیغات گوگل (فقط در HaGeZi Pro++ هست)
+  fullstory.com               # session replay
+  smartlook.com
+  contentsquare.com
+  logrocket.com
+  glassbox.com
+  segment.io
 )
 
 # --- block: منابع مسدودسازی ---
@@ -155,9 +179,17 @@ case "$LEVEL" in lite|normal|full) ;; *) die "--level باید lite یا normal 
 case "$RS_VERSION" in 1|2|3) ;; *) die "--rs-version باید 1 یا 2 یا 3 باشد." ;; esac
 
 case "$LEVEL" in
-  lite)   BLOCK_TEXT=("$HAGEZI/light-onlydomains.txt");    THREAT_TEXT=();                                BLOCK_EXTRA_CHOCO=() ;;
-  normal) BLOCK_TEXT=("$HAGEZI/pro.mini-onlydomains.txt"); THREAT_TEXT=("$HAGEZI/tif.mini-onlydomains.txt");   BLOCK_EXTRA_CHOCO=() ;;
-  full)   BLOCK_TEXT=("$HAGEZI/pro-onlydomains.txt");      THREAT_TEXT=("$HAGEZI/tif.medium-onlydomains.txt"); BLOCK_EXTRA_CHOCO=(geosite-category-ads-all) ;;
+  lite)   BLOCK_TEXT=("$HAGEZI/light-onlydomains.txt")
+          THREAT_TEXT=()
+          BLOCK_EXTRA_CHOCO=() ;;
+  normal) BLOCK_TEXT=("$HAGEZI/pro.mini-onlydomains.txt" "$HAGEZI/popupads-onlydomains.txt")
+          THREAT_TEXT=("$HAGEZI/tif.mini-onlydomains.txt" "$HAGEZI/fake-onlydomains.txt")
+          BLOCK_EXTRA_CHOCO=(geosite-category-ads geosite-google@ads geosite-facebook@ads
+            geosite-amazon@ads geosite-apple@ads geosite-microsoft@ads geosite-yandex@ads) ;;
+  full)   BLOCK_TEXT=("$HAGEZI/pro-onlydomains.txt" "$HAGEZI/popupads-onlydomains.txt")
+          THREAT_TEXT=("$HAGEZI/tif.medium-onlydomains.txt" "$HAGEZI/fake-onlydomains.txt")
+          BLOCK_EXTRA_CHOCO=(geosite-category-ads-all geosite-google@ads geosite-facebook@ads
+            geosite-amazon@ads geosite-apple@ads geosite-microsoft@ads geosite-yandex@ads) ;;
 esac
 
 have curl    || die "curl نصب نیست."
@@ -328,6 +360,14 @@ STRICT, REPORT = E.get("STRICT") == "1", E.get("REPORT") == "1"
 WITH_V6 = E.get("WITH_IPV6", "1") == "1"
 DENY = set(E.get("DENY_DIRECT", "").split())
 KEEP = set(E.get("KEEP_DIRECT", "").split())
+NEVER = {x.strip(".").lower() for x in E.get("NEVER_BLOCK", "").split() if x.strip()}
+NEVER_EXACT = {x.strip(".").lower() for x in E.get("NEVER_BLOCK_EXACT", "").split() if x.strip()}
+def is_never(c):
+    c = c.strip(".").lower()
+    if c in NEVER_EXACT or c in NEVER:
+        return True
+    return any(c.endswith("." + n) for n in NEVER)
+
 RS_VERSION = int(E.get("RS_VERSION", "1"))
 CRIT_RE = re.compile(E.get("CRITICAL_CATEGORIES", r"category-(bank|payment|gov|bourse|insurance)-ir"))
 STATIC_FOREIGN_IP = []
@@ -543,11 +583,15 @@ for grp, ex, anc in (("blockir", set(), set()), ("threat", PROT_CRIT, PROT_CRIT_
         # (زون‌های DynDNS بخش خصوصی PSL عمداً در HaGeZi TIF هستند و می‌مانند)
         if c in PSL_ICANN or "." not in c:
             report[R_PSL].add(c); continue
+        if is_never(c):
+            report["block: ضروری (مسدود نشد)"].add(c); continue
         if c in KEEP or c in anc:
             report[R_PROT].add(c); continue
         if grp == "threat" and c in PROT_ALL_ANC: report[R_THREAT].add(c)
         blk.suf.add(x)
     for d in src.dom:
+        if is_never(d):
+            report["block: ضروری (مسدود نشد)"].add(d); continue
         if d in KEEP or d in ex:
             report[R_PROT].add(d); continue
         if grp == "threat" and d in PROT_ALL: report[R_THREAT].add(d)
@@ -681,6 +725,7 @@ PYEOF
 log "۳) بررسی، پاک‌سازی و ادغام ..."
 STRICT="$STRICT" REPORT="$REPORT" WITH_IPV6="$WITH_IPV6" RS_VERSION="$RS_VERSION" \
 DENY_DIRECT="${DENY_DIRECT[*]}" KEEP_DIRECT="${KEEP_DIRECT[*]}" EXTRA_BLOCK="${EXTRA_BLOCK[*]}" \
+NEVER_BLOCK="${NEVER_BLOCK[*]}" NEVER_BLOCK_EXACT="${NEVER_BLOCK_EXACT[*]}" \
 FOREIGN_STATIC_IPS="${FOREIGN_STATIC_IPS[*]}" CRITICAL_CATEGORIES="$CRITICAL_CATEGORIES" \
   python3 "$TMP/engine.py" "$MANIFEST" "$TMP" "$MODE" || die "پردازش ناموفق بود."
 [ "$STRICT" -eq 1 ] && warn "حالت strict: اگر خارج از ایران اجرا شد، ممکن است سایت‌های ایرانیِ دارای GeoDNS هم حذف شده باشند."
@@ -713,8 +758,9 @@ if [ "$MODE" != "direct" ]; then
   ok "ads-merged.srs ($(wc -c < "$OUT_DIR/ads-merged.srs" | awk '{printf "%.0f KB", $1/1024}'))"
   test_set "$OUT_DIR/ads-merged.srs" "→ مسدود ✓" "→ آزاد" \
     yektanet.com adivery.com googleads.g.doubleclick.net pagead2.googlesyndication.com \
-    ad.doubleclick.net adservice.google.com \
-    digikala.com shaparak.ir bankmellat.ir mihanblog.com mcinext.com google.com
+    ad.doubleclick.net adservice.google.com luckyorange.com fullstory.com \
+    digikala.com shaparak.ir bankmellat.ir mihanblog.com mcinext.com google.com \
+    googletagmanager.com graph.instagram.com instagram.com
 fi
 
 # ----------------------- ۵) بررسی نهایی فایل‌های خروجی -----------------------
