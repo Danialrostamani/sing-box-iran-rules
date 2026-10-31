@@ -2,26 +2,42 @@
   "route": {
     "rule_set": [
       {
-        "tag": "ads-merged",
+        "tag": "ads-merged-domains",
         "type": "remote",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged.srs",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged-domains.srs",
         "download_detour": "direct",
-        "update_interval": "7d"
+        "update_interval": "1d"
       },
       {
-        "tag": "iran-all",
+        "tag": "ads-merged-ips",
         "type": "remote",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all.srs",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged-ips.srs",
         "download_detour": "direct",
-        "update_interval": "7d"
+        "update_interval": "1d"
+      },
+      {
+        "tag": "iran-all-domains",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all-domains.srs",
+        "download_detour": "direct",
+        "update_interval": "1d"
+      },
+      {
+        "tag": "iran-all-ips",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all-ips.srs",
+        "download_detour": "direct",
+        "update_interval": "1d"
       }
     ],
     "rules": [
       { "action": "sniff" },
-      { "rule_set": "ads-merged", "action": "reject" },
-      { "rule_set": "iran-all", "outbound": "direct" }
+      { "rule_set": ["ads-merged-domains", "ads-merged-ips"], "action": "reject" },
+      { "rule_set": ["iran-all-domains", "iran-all-ips"], "outbound": "direct" }
     ],
     "final": "proxy"
   }

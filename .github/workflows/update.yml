@@ -2,8 +2,8 @@ name: Update rule-sets
 
 on:
   schedule:
-    # هر دوشنبه ۰۳:۳۰ UTC ≈ ۰۷:۰۰ تهران
-    - cron: "30 3 * * 1"
+    # هر روز ساعت ۰۳:۰۰ تهران = ۲۳:۳۰ UTC روز قبل (ایران از ۱۴۰۱ ساعت تابستانی ندارد)
+    - cron: "30 23 * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -18,6 +18,15 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  FILES: >-
+    iran-all-domains.srs iran-all-ips.srs
+    ads-merged-domains.srs ads-merged-ips.srs
+    iran-all-domains.json iran-all-ips.json
+    ads-merged-domains.json ads-merged-ips.json
+  # تعداد Releaseهای روزانه‌ای که نگه داشته می‌شوند (قدیمی‌ترها حذف می‌شوند)
+  KEEP_RELEASES: "7"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,10 +36,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install sing-box
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          VER=$(curl -fsSL https://api.github.com/repos/SagerNet/sing-box/releases/latest \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')
+          # با توکن، تا محدودیت ۶۰ درخواست/ساعت API ناشناس باعث شکست نشود
+          VER=$(gh release view -R SagerNet/sing-box --json tagName -q .tagName | sed 's/^v//')
           echo "sing-box $VER"
           curl -fsSL -o /tmp/sb.tgz \
             "https://github.com/SagerNet/sing-box/releases/download/v${VER}/sing-box-${VER}-linux-amd64.tar.gz"
@@ -38,16 +49,15 @@ jobs:
           sudo install -m 0755 /tmp/sing-box-*/sing-box /usr/local/bin/sing-box
           sing-box version
 
-      - name: Build iran-all + ads-merged
+      - name: Build rule-sets (domains and IPs separated)
         run: |
           set -euo pipefail
           chmod +x iran-one-srs.sh
           mkdir -p dist
           ./iran-one-srs.sh --yes --report -d dist
-          test -f dist/iran-all.srs
-          test -f dist/ads-merged.srs
           cd dist
-          sha256sum iran-all.srs ads-merged.srs iran-all.json ads-merged.json | tee SHA256SUMS
+          for f in $FILES; do test -s "$f" || { echo "missing: $f"; exit 1; }; done
+          sha256sum $FILES | tee SHA256SUMS
           ls -lh
 
       - name: Publish files to release branch
@@ -55,8 +65,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG=$(date -u +%Y%m%d)
-          DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
+          # تاریخ به وقت تهران (اجرا ۲۳:۳۰ UTC است و تاریخ UTC یک روز عقب می‌افتد)
+          TAG=$(TZ=Asia/Tehran date +%Y%m%d)
+          DATE=$(TZ=Asia/Tehran date +'%Y-%m-%d %H:%M (Tehran)')
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "DATE=$DATE" >> "$GITHUB_ENV"
           cd dist
@@ -64,7 +75,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan release
-          git add iran-all.srs ads-merged.srs iran-all.json ads-merged.json report.txt SHA256SUMS
+          git add $FILES report.txt SHA256SUMS
           git commit -m "update rule-sets ${TAG}"
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}"
           git push -f origin release
@@ -72,11 +83,11 @@ jobs:
       - name: Purge jsDelivr cache
         continue-on-error: true
         run: |
-          for f in iran-all.srs ads-merged.srs iran-all.json ads-merged.json report.txt SHA256SUMS; do
+          for f in $FILES report.txt SHA256SUMS; do
             curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release/${f}" || true
           done
 
-      - name: GitHub Release (replaces latest)
+      - name: GitHub Release (latest + prune old)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -85,15 +96,22 @@ jobs:
 
           | فایل | کاربرد |
           |---|---|
-          | \`iran-all.srs\` | دایرکت ایران (دامنه + IP) |
-          | \`ads-merged.srs\` | مسدودسازی تبلیغات، ردیاب، بدافزار، فیشینگ |
+          | \`iran-all-domains.srs\` | دامنه‌های ایرانی → direct |
+          | \`iran-all-ips.srs\` | رنج IPهای ایرانی → direct |
+          | \`ads-merged-domains.srs\` | دامنه‌های تبلیغات، ردیاب، بدافزار، فیشینگ → reject |
+          | \`ads-merged-ips.srs\` | IPهای بدافزار و فیشینگ → reject |
 
-          ترتیب رول در sing-box: **اول ads-merged، بعد iran-all**."
+          ترتیب رول در sing-box: **اول ads-merged-*، بعد iran-all-***."
           gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
-          gh release create "$TAG" \
-            dist/iran-all.srs dist/ads-merged.srs \
-            dist/iran-all.json dist/ads-merged.json \
-            dist/report.txt dist/SHA256SUMS \
+          ASSETS=""
+          for f in $FILES report.txt SHA256SUMS; do ASSETS="$ASSETS dist/$f"; done
+          gh release create "$TAG" $ASSETS \
             --title "Rule-sets $TAG" \
             --notes "$NOTES" \
             --latest
+          # فقط آخرین KEEP_RELEASES نسخهٔ روزانه (تگ‌های ۸ رقمی) نگه داشته می‌شوند
+          gh release list --limit 200 --json tagName,createdAt \
+            -q "[.[] | select(.tagName | test(\"^[0-9]{8}\$\"))] | sort_by(.createdAt) | reverse | .[${KEEP_RELEASES}:] | .[].tagName" \
+            | while read -r t; do
+                [ -n "$t" ] && gh release delete "$t" -y --cleanup-tag || true
+              done

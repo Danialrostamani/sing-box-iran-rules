@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  iran-one-srs.sh  v2.3  —  ساخت دو فایل srs برای sing-box
+#  iran-one-srs.sh  v3.0  —  ساخت چهار فایل srs برای sing-box (دامنه و IP جدا)
 #  ----------------------------------------------------------------------------
-#    iran-all.srs   ← سایت‌ها و IPهای ایرانی که باید «direct» شوند (با بررسی دقیق)
-#    ads-merged.srs  ← تبلیغات، ردیاب، بدافزار، فیشینگ، ماینر  (برای «reject»)
+#    iran-all-domains.srs    ← دامنه‌های ایرانی که باید «direct» شوند (با بررسی دقیق)
+#    iran-all-ips.srs        ← رنج IPهای ایرانی که باید «direct» شوند
+#    ads-merged-domains.srs  ← دامنه‌های تبلیغات، ردیاب، بدافزار، فیشینگ، ماینر  («reject»)
+#    ads-merged-ips.srs      ← IPهای بدافزار/فیشینگ  («reject»)
 #
-#  ┌─ iran-all.srs (direct) ───────────────────────────────────────────────────┐
+#  ┌─ iran-all-*.srs (direct) ─────────────────────────────────────────────────┐
 #  │ منابع: Chocolate4U (geosite-ir, geoip-ir, هاستینگ‌های ایرانی،         │
 #  │        همهٔ category-*-ir با جستجوی خودکار) + MetaCubeX (ir)           │
 #  │        + bootmortis/iran-hosted-domains + Loyalsoldier/geoip           │
@@ -18,11 +20,11 @@
 #  │      و لیست sanctioned (سایت‌هایی که IP ایران را تحریم کرده‌اند)       │
 #  │   ۴. کم کردن رنج IPهای CDN/ابرهای خارجی (Cloudflare, Google, AWS, ...) │
 #  │      و IPهای خصوصی/رزرو از رنج‌های ایران                              │
-#  │   ۵. مستثنا کردن تبلیغات/بدافزار/فیشینگ (هم‌پوشانی با ads-merged.srs)       │
+#  │   ۵. مستثنا کردن تبلیغات/بدافزار/فیشینگ (هم‌پوشانی با ads-merged-*.srs)     │
 #  │   ۶. (--strict) بررسی DNS: دامنه‌ای که به IP غیرایرانی resolve شود     │
 #  │      حذف می‌شود — این گزینه را داخل ایران اجرا کنید                   │
 #  └───────────────────────────────────────────────────────────────────────┘
-#  ┌─ ads-merged.srs (reject) ──────────────────────────────────────────────────┐
+#  ┌─ ads-merged-*.srs (reject) ───────────────────────────────────────────────┐
 #  │ lite  : تبلیغات/ردیاب ایرانی + malware/phishing/cryptominers          │
 #  │         + HaGeZi Light                                                │
 #  │ normal: lite + HaGeZi Pro-mini + popupads + Fake + TIF-mini           │
@@ -37,9 +39,9 @@
 #  └───────────────────────────────────────────────────────────────────────┘
 #
 #  استفاده:
-#     ./iran-one-srs.sh                     # هر دو فایل در پوشهٔ فعلی
-#     ./iran-one-srs.sh direct              # فقط iran-all.srs
-#     ./iran-one-srs.sh block --level full  # فقط ads-merged.srs با بیشترین پوشش
+#     ./iran-one-srs.sh                     # هر چهار فایل در پوشهٔ فعلی
+#     ./iran-one-srs.sh direct              # فقط iran-all-domains.srs و iran-all-ips.srs
+#     ./iran-one-srs.sh block --level full  # فقط ads-merged-*.srs با بیشترین پوشش
 #     ./iran-one-srs.sh -d /etc/sing-box --yes --report
 #
 #  گزینه‌ها:
@@ -59,7 +61,7 @@
 # ============================================================================
 
 set -uo pipefail
-VERSION="2.3.0"
+VERSION="3.0.0"
 
 MODE="all"
 OUT_DIR="."
@@ -323,7 +325,7 @@ add direct ip   "loyalsoldier-ir" "$LS_IP"
 for r in "${FOREIGN_SITES[@]}"; do add foreign srs "$r" "$CHOCO_RAW/$r.srs"; done
 for r in "${FOREIGN_IPS[@]}";   do add foreign srs "$r" "$CHOCO_RAW/$r.srs"; done
 add psl psl "public-suffix-list" "$PSL_URL"
-# block همیشه دانلود می‌شود (برای پاک‌سازی iran-all.srs هم لازم است)
+# block همیشه دانلود می‌شود (برای پاک‌سازی iran-all-*.srs هم لازم است)
 for r in "${BLOCK_IR_CHOCO[@]}"; do add blockir srs "$r" "$CHOCO_RAW/$r.srs"; done
 for u in "${BLOCK_IR_TEXT[@]}";  do add blockir text "$(basename "$u")" "$u"; done
 for r in ${BLOCK_EXTRA_CHOCO[@]+"${BLOCK_EXTRA_CHOCO[@]}"}; do add block srs "$r" "$CHOCO_RAW/$r.srs"; done
@@ -612,7 +614,12 @@ if INVALID: report["ورودی نامعتبر در منابع (حذف شد)"] = 
 
 if mode in ("all", "block"):
     nets = iv_nets(blk4, 4) + (iv_nets(blk6, 6) if WITH_V6 else [])
-    emit(os.path.join(outdir, "block.json"), plain_rules(blk, nets))
+    blk_dom_rules, blk_ip_rules = plain_rules(blk, []), plain_rules(DS(), nets)
+    if not blk_dom_rules or not blk_ip_rules:
+        say("block: لیست دامنه یا IP خالی است (منابع دریافت نشدند؟) — ساخت متوقف شد")
+        sys.exit(1)
+    emit(os.path.join(outdir, "block-domains.json"), blk_dom_rules)
+    emit(os.path.join(outdir, "block-ips.json"), blk_ip_rules)
     say(f"block: دامنه {fa(before_blk)} → {fa(len(blk.suf) + len(blk.dom))} (بعد از حذف تکراری) | "
         f"keyword {len(blk.kw)} | regex {len(blk.rx)} | IP {fa(len(nets))}")
     say(f"block: {fa(len(report[R_PROT]))} دامنهٔ ایرانی از لیست‌های عمومی محافظت شد | "
@@ -695,18 +702,22 @@ if mode in ("all", "direct"):
     tmp = DS(); tmp.suf, tmp.dom = inv_suf, inv_dom; reduce_ds(tmp)
 
     nets = iv_nets(ir4, 4) + iv_nets(ir6, 6)
-    base = plain_rules(d, [])
-    base = base[0] if base else {}
-    if nets: base["ip_cidr"] = [str(n) for n in nets]
+    dom_base = plain_rules(d, [])
+    if not dom_base or not nets:
+        say("direct: لیست دامنه یا IP خالی است (منابع دریافت نشدند؟) — ساخت متوقف شد")
+        sys.exit(1)
+    neg = None
     if tmp.suf or tmp.dom:
         neg = {}
         if tmp.dom: neg["domain"] = sorted(tmp.dom)
         if tmp.suf: neg["domain_suffix"] = sorted(tmp.suf)
         neg["invert"] = True
-        rules = [{"type": "logical", "mode": "and", "rules": [base, neg]}]
-    else:
-        rules = [base]
-    emit(os.path.join(outdir, "iran.json"), rules)
+    # استثناها (سرویس‌های خارجی/تبلیغات) روی هر دو فایل اعمال می‌شوند تا اتصال به IP ایرانی
+    # که دامنهٔ sniff‌شده‌اش خارجی است (مثل google.com) direct نشود — همان رفتار نسخهٔ قبل.
+    def wrap(base):
+        return [{"type": "logical", "mode": "and", "rules": [base, neg]}] if neg else [base]
+    emit(os.path.join(outdir, "iran-domains.json"), wrap(dom_base[0]))
+    emit(os.path.join(outdir, "iran-ips.json"), wrap({"ip_cidr": [str(n) for n in nets]}))
 
     say(f"direct: دامنه {fa(raw_n)} → {fa(len(d.suf) + len(d.dom))} | "
         f"IPv4 {fa(len(iv_nets(ir4, 4)))} رنج | IPv6 {fa(len(iv_nets(ir6, 6)))} رنج")
@@ -744,23 +755,28 @@ test_set() { # test_set <srs> <label-yes> <label-no> <hosts...>
     else printf '      %-22s %s\n' "$t" "$n" >&2; fi
   done
 }
+publish() { # publish <json-name-in-TMP> <output-basename>
+  compile "$TMP/$1.json" "$OUT_DIR/$2.srs"
+  cp -f "$TMP/$1.json" "$OUT_DIR/$2.json"
+  ok "$2.srs  ($(wc -c < "$OUT_DIR/$2.srs" | awk '{printf "%.0f KB", $1/1024}'))"
+}
 if [ "$MODE" != "block" ]; then
-  compile "$TMP/iran.json" "$OUT_DIR/iran-all.srs"
-  cp -f "$TMP/iran.json" "$OUT_DIR/iran-all.json"
-  ok "iran-all.srs  ($(wc -c < "$OUT_DIR/iran-all.srs" | awk '{printf "%.0f KB", $1/1024}'))"
-  test_set "$OUT_DIR/iran-all.srs" "→ direct ✓" "→ direct نمی‌شود" \
-    digikala.com shaparak.ir aparat.com snapp.ir mcinext.com 2.144.0.1 \
-    google.com telegram.org yektanet.com dyndns.org epizy.com 104.28.11.28 2001:470:1f0b::1
+  publish iran-domains iran-all-domains
+  test_set "$OUT_DIR/iran-all-domains.srs" "→ direct ✓" "→ direct نمی‌شود" \
+    digikala.com shaparak.ir aparat.com snapp.ir mcinext.com \
+    google.com telegram.org yektanet.com dyndns.org epizy.com
+  publish iran-ips iran-all-ips
+  test_set "$OUT_DIR/iran-all-ips.srs" "→ direct ✓" "→ direct نمی‌شود" \
+    2.144.0.1 104.28.11.28 2001:470:1f0b::1
 fi
 if [ "$MODE" != "direct" ]; then
-  compile "$TMP/block.json" "$OUT_DIR/ads-merged.srs"
-  cp -f "$TMP/block.json" "$OUT_DIR/ads-merged.json"
-  ok "ads-merged.srs ($(wc -c < "$OUT_DIR/ads-merged.srs" | awk '{printf "%.0f KB", $1/1024}'))"
-  test_set "$OUT_DIR/ads-merged.srs" "→ مسدود ✓" "→ آزاد" \
+  publish block-domains ads-merged-domains
+  test_set "$OUT_DIR/ads-merged-domains.srs" "→ مسدود ✓" "→ آزاد" \
     yektanet.com adivery.com googleads.g.doubleclick.net pagead2.googlesyndication.com \
     ad.doubleclick.net adservice.google.com luckyorange.com fullstory.com \
     digikala.com shaparak.ir bankmellat.ir mihanblog.com mcinext.com google.com \
     googletagmanager.com graph.instagram.com instagram.com
+  publish block-ips ads-merged-ips
 fi
 
 # ----------------------- ۵) بررسی نهایی فایل‌های خروجی -----------------------
@@ -798,24 +814,32 @@ sys.exit(1 if (bad_dom or bad_ip) else 0)
 PY
 }
 VERIFY_FAIL=0
-[ "$MODE" != "block" ]  && { verify_srs "$OUT_DIR/iran-all.srs"  iran  || VERIFY_FAIL=1; }
-[ "$MODE" != "direct" ] && { verify_srs "$OUT_DIR/ads-merged.srs" block || VERIFY_FAIL=1; }
+if [ "$MODE" != "block" ]; then
+  verify_srs "$OUT_DIR/iran-all-domains.srs" iran-domains || VERIFY_FAIL=1
+  verify_srs "$OUT_DIR/iran-all-ips.srs"     iran-ips     || VERIFY_FAIL=1
+fi
+if [ "$MODE" != "direct" ]; then
+  verify_srs "$OUT_DIR/ads-merged-domains.srs" ads-domains || VERIFY_FAIL=1
+  verify_srs "$OUT_DIR/ads-merged-ips.srs"     ads-ips     || VERIFY_FAIL=1
+fi
 [ "$VERIFY_FAIL" -eq 0 ] && ok "همهٔ ورودی‌ها در جای درست هستند (دامنه در بخش دامنه، IP در بخش ip_cidr)" \
                          || warn "بررسی نهایی ایراد پیدا کرد؛ گزارش بالا را ببینید."
 [ "$REPORT" -eq 1 ] && cp "$TMP/report.txt" "$OUT_DIR/report.txt" && ok "گزارش: $OUT_DIR/report.txt"
 
 cat >&2 <<'EOF'
 
-  ─── در کانفیگ sing-box (ترتیب مهم است: اول block، بعد iran) ───
+  ─── در کانفیگ sing-box (ترتیب مهم است: اول ads، بعد iran) ───
   "route": {
     "rule_set": [
-      { "tag": "ads-merged", "type": "local", "format": "binary", "path": "ads-merged.srs" },
-      { "tag": "iran-all",  "type": "local", "format": "binary", "path": "iran-all.srs" }
+      { "tag": "ads-merged-domains", "type": "local", "format": "binary", "path": "ads-merged-domains.srs" },
+      { "tag": "ads-merged-ips",     "type": "local", "format": "binary", "path": "ads-merged-ips.srs" },
+      { "tag": "iran-all-domains",   "type": "local", "format": "binary", "path": "iran-all-domains.srs" },
+      { "tag": "iran-all-ips",       "type": "local", "format": "binary", "path": "iran-all-ips.srs" }
     ],
     "rules": [
       { "action": "sniff" },
-      { "rule_set": "ads-merged", "action": "reject" },
-      { "rule_set": "iran-all",  "outbound": "direct" }
+      { "rule_set": ["ads-merged-domains", "ads-merged-ips"], "action": "reject" },
+      { "rule_set": ["iran-all-domains", "iran-all-ips"], "outbound": "direct" }
     ],
     "final": "proxy"
   }
