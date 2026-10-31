@@ -110,6 +110,12 @@ DENY_DIRECT=(co.com dyndns.org selfip.com ddnsguru.com sells-it.net epizy.com we
   lumen5.com info.com salamair.com 3cx.eu somee.com speedcheckerapi.com)
 # همیشه direct بمانند (حتی اگر در لیست تبلیغات/خارجی باشند)
 KEEP_DIRECT=(zarin.link sabaidea.cloud liara.run)
+# دامنه‌های دستی که «اضافه» می‌شوند به iran-all-domains (خودش و زیردامنه‌ها).
+# فیلترهای PSL/خارجی/strict رویشان اعمال نمی‌شود، ولی اگر لیست تهدید/تبلیغات
+# مسدودشان کند، reject (که قبل از direct است) همچنان اولویت دارد.
+EXTRA_DIRECT=(
+  bank-keshavarzi.com         # روی اینترنت داخلی باز می‌شود، از پروکسی نه
+)
 
 # دامنه‌هایی که هرگز reject نمی‌شوند (سایت را نمی‌شکنند).
 # NEVER_BLOCK: خودش و زیردامنه‌ها.  NEVER_BLOCK_EXACT: فقط همان دامنه (نه ads.google.com).
@@ -630,6 +636,12 @@ if mode in ("all", "block"):
 # ======================= DIRECT =======================
 if mode in ("all", "direct"):
     d = union("direct")
+    # دامنه‌های دستی EXTRA_DIRECT: اضافه و از همهٔ حذف‌های بخش direct مصون
+    # (بعد از بخش block، تا محافظت تبلیغات/تهدید شامل‌شان نشود)
+    EXTRA = {x.strip(".").lower() for x in E.get("EXTRA_DIRECT", "").split() if DOMRE.match(x.strip(".").lower())}
+    d.suf |= EXTRA
+    KEEP = KEEP | EXTRA
+    for x in EXTRA: report["direct: دستی (EXTRA_DIRECT)"].add(x)
     raw_n = len(d.suf) + len(d.dom)
     # ۱ و ۲: پسوند عمومی و دامنه‌های خارجی شناخته‌شده
     for x in list(d.suf):
@@ -735,7 +747,7 @@ PYEOF
 
 log "۳) بررسی، پاک‌سازی و ادغام ..."
 STRICT="$STRICT" REPORT="$REPORT" WITH_IPV6="$WITH_IPV6" RS_VERSION="$RS_VERSION" \
-DENY_DIRECT="${DENY_DIRECT[*]}" KEEP_DIRECT="${KEEP_DIRECT[*]}" EXTRA_BLOCK="${EXTRA_BLOCK[*]}" \
+DENY_DIRECT="${DENY_DIRECT[*]}" KEEP_DIRECT="${KEEP_DIRECT[*]}" EXTRA_BLOCK="${EXTRA_BLOCK[*]}" EXTRA_DIRECT="${EXTRA_DIRECT[*]}" \
 NEVER_BLOCK="${NEVER_BLOCK[*]}" NEVER_BLOCK_EXACT="${NEVER_BLOCK_EXACT[*]}" \
 FOREIGN_STATIC_IPS="${FOREIGN_STATIC_IPS[*]}" CRITICAL_CATEGORIES="$CRITICAL_CATEGORIES" \
   python3 "$TMP/engine.py" "$MANIFEST" "$TMP" "$MODE" || die "پردازش ناموفق بود."
