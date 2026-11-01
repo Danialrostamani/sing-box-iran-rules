@@ -30,7 +30,6 @@
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged-domains.srs",
-        "download_detour": "direct",
         "update_interval": "1d"
       },
       {
@@ -38,7 +37,6 @@
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/ads-merged-ips.srs",
-        "download_detour": "direct",
         "update_interval": "1d"
       },
       {
@@ -46,7 +44,6 @@
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all-domains.srs",
-        "download_detour": "direct",
         "update_interval": "1d"
       },
       {
@@ -54,7 +51,6 @@
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/iran-all-ips.srs",
-        "download_detour": "direct",
         "update_interval": "1d"
       }
     ],
