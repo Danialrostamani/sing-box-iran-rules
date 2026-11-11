@@ -22,6 +22,8 @@ env:
   FILES: >-
     iran-all-domains.srs iran-all-ips.srs
     ads-merged-domains.srs ads-merged-ips.srs
+    geosite-gaming.srs geosite-gaming.json
+    geosite-anti-403.srs geosite-anti-403.json
     iran-all-domains.json iran-all-ips.json
     ads-merged-domains.json ads-merged-ips.json
   # تعداد Releaseهای روزانه‌ای که نگه داشته می‌شوند (قدیمی‌ترها حذف می‌شوند)
@@ -100,8 +102,10 @@ jobs:
           | \`iran-all-ips.srs\` | رنج IPهای ایرانی → direct |
           | \`ads-merged-domains.srs\` | دامنه‌های تبلیغات، ردیاب، بدافزار، فیشینگ → reject |
           | \`ads-merged-ips.srs\` | IPهای بدافزار و فیشینگ → reject |
+          | \`geosite-gaming.srs\` | دامنه‌های بازی‌های آنلاین (Steam, Riot, EA, ...) → route |
+          | \`geosite-anti-403.srs\` | دامنه‌های تحریم‌شده/۴۰۳ برای کاربران ایران (Docker, OpenAI, ...) → route |
 
-          ترتیب رول در sing-box: **اول ads-merged-*، بعد iran-all-***."
+          ترتیب رول در sing-box: **اول ads-merged-*، بعد geosite-*، بعد iran-all-***."
           gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
           ASSETS=""
           for f in $FILES report.txt SHA256SUMS; do ASSETS="$ASSETS dist/$f"; done
@@ -116,3 +120,18 @@ jobs:
             | while read -r t; do
                 [ -n "$t" ] && gh release delete "$t" -y --cleanup-tag || true
               done
+
+      - name: Update rule-set-geosite on main branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p rule-set-geosite
+          cp -f dist/geosite-gaming.* dist/geosite-anti-403.* rule-set-geosite/
+          if [ -n "$(git status --porcelain rule-set-geosite)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add rule-set-geosite/
+            git commit -m "chore(geosite): auto-update gaming and anti-403 rule-sets [skip ci]"
+            git push origin main || true
+          fi

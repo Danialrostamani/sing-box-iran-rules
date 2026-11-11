@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  iran-one-srs.sh  v3.0  —  ساخت چهار فایل srs برای sing-box (دامنه و IP جدا)
+#  iran-one-srs.sh  v3.1  —  ساخت فایل‌های srs اختصاصی برای sing-box
 #  ----------------------------------------------------------------------------
 #    iran-all-domains.srs    ← دامنه‌های ایرانی که باید «direct» شوند (با بررسی دقیق)
 #    iran-all-ips.srs        ← رنج IPهای ایرانی که باید «direct» شوند
 #    ads-merged-domains.srs  ← دامنه‌های تبلیغات، ردیاب، بدافزار، فیشینگ، ماینر  («reject»)
 #    ads-merged-ips.srs      ← IPهای بدافزار/فیشینگ  («reject»)
+#    geosite-gaming.srs      ← دامنه‌های بازی‌های آنلاین (Steam, Riot, EA, Blizzard, ...)
+#    geosite-anti-403.srs    ← دامنه‌های تحریم‌شده/۴۰۳ برای کاربران ایران (Docker, OpenAI, ...)
 #
 #  ┌─ iran-all-*.srs (direct) ─────────────────────────────────────────────────┐
 #  │ منابع: Chocolate4U (geosite-ir, geoip-ir, هاستینگ‌های ایرانی،         │
@@ -153,6 +155,92 @@ BLOCK_IR_TEXT=("$BOOT_DL/surge_domainset_ads.txt"
   "$PBLOCK/PersianBlockerAds-Domains.txt"
   "$PBLOCK/PersianBlockerTrackers-Domains.txt"
   "$PBLOCK/PersianBlockerHosts.txt")
+
+# --- gaming & anti-403 ---
+GAMING_CHOCO=(geosite-category-games)
+GAMING_META=("geosite/category-games.srs")
+ANTI403_CHOCO=(geosite-sanctioned)
+
+EXTRA_GAMING=(
+  discord.com discord.gg discord.media discordapp.com discordapp.net
+  valorant.com playvalorant.com riotgames.com leagueoflegends.com riotcdn.net pvp.net
+  respawn.com ea.com origin.com electronicarts.com dice.se eafifa.com eaassets-a.akamaihd.net
+  callofduty.com activision.com demonware.net battle.net blizzard.com bnet.cc
+  steampowered.com steamcommunity.com steamstatic.com steamgames.com steamserver.net valvesoftware.com steamcontent.com
+  epicgames.com unrealengine.com fortnite.com epicgames.dev
+  ubisoft.com uplay.com ubi.com ubisoftconnect.com
+  playstation.com playstation.net sonyentertainmentnetwork.com playstationnetwork.com
+  xbox.com xboxlive.com gamepass.com xboxservices.com
+  nintendo.com nintendo.net
+  pubg.com pubgmobile.com krafton.com
+  escapefromtarkov.com tarkov.com battlestategames.com
+  hoyoverse.com mihoyo.com genshinimpact.com honkaistarrail.com zenlesszonezero.com
+  supercell.com supercell.net clashofclans.com brawlstars.com clashroyale.com
+  rockstargames.com rsg.sc rockstarnorth.com 2k.com 2kgames.com take2games.com
+  easyanticheat.net easy.ac battleye.com vanguard.riotgames.com
+  faceit.com esea.net hltv.org dotabuff.com vlr.gg op.gg tracker.gg
+  twitch.tv ttvnw.net
+  garena.com freefiremobile.com
+  roblox.com rbxcdn.com minecraft.net mojang.com
+  radar.game electrotm.org
+)
+
+EXTRA_ANTI_403=(
+  openai.com chatgpt.com oaistatic.com oaiusercontent.com
+  anthropic.com claude.ai
+  midjourney.com suno.com suno.ai elevenlabs.io
+  perplexity.ai replicate.com huggingface.co cohere.com cohere.ai
+  cursor.com cursor.sh v0.dev poe.com runwayml.com stability.ai
+  docker.com docker.io dockerhub.com
+  oracle.com java.com graalvm.org
+  intel.com intel.de
+  nvidia.com developer.nvidia.com geforce.com
+  amd.com
+  developer.android.com android.com source.android.com maven.google.com
+  gradle.org gradle.com
+  atlassian.com atlassian.net jira.com trello.com bitbucket.org
+  postman.com getpostman.com postman.co
+  gitlab.com
+  figma.com figma.cool
+  canva.com
+  adobe.com adobelogin.com adobe.io behance.net
+  autodesk.com
+  unity.com unity3d.com
+  unrealengine.com
+  kaggle.com
+  coursera.org edx.org udemy.com
+  spotify.com scdn.co spotifycdn.com
+  notion.so notion.site notion.com
+  slack.com slack-edge.com
+  sentry.io
+  datadoghq.com datadog.com
+  grafana.com
+  newrelic.com
+  hashicorp.com terraform.io vagrantup.com
+  mongodb.com mongodb.org
+  redis.io redis.com
+  firebase.google.com firebaseio.com
+  cloud.google.com cloudfunctions.net appspot.com
+  aws.amazon.com
+  azure.com azureedge.net
+  cloudflare.com dash.cloudflare.com workers.dev pages.dev
+  vercel.com vercel.app
+  netlify.com netlify.app
+  supabase.com supabase.co
+  render.com
+  railway.app
+  fly.io
+  heroku.com
+  digitalocean.com
+  linode.com
+  vultr.com
+  stripe.com
+  paypal.com
+  medium.com
+  quora.com
+  zoom.us zoom.com
+  403.online shecan.ir electrotm.org begzar.ir
+)
 
 # ------------------------------- ظاهر ---------------------------------------
 if [ -t 2 ]; then C_G=$'\e[32m'; C_Y=$'\e[33m'; C_R=$'\e[31m'; C_C=$'\e[36m'; C_0=$'\e[0m'
@@ -338,6 +426,11 @@ for r in ${BLOCK_EXTRA_CHOCO[@]+"${BLOCK_EXTRA_CHOCO[@]}"}; do add block srs "$r
 for u in "${BLOCK_TEXT[@]}";     do add block text "hagezi-$(basename "$u")" "$u"; done
 for r in "${THREAT_CHOCO[@]}";   do add threat srs "$r" "$CHOCO_RAW/$r.srs"; done
 for u in ${THREAT_TEXT[@]+"${THREAT_TEXT[@]}"}; do add threat text "hagezi-$(basename "$u")" "$u"; done
+if [ "$MODE" = "all" ]; then
+  for r in "${GAMING_CHOCO[@]}"; do add gaming srs "$r" "$CHOCO_RAW/$r.srs"; done
+  for m in "${GAMING_META[@]}";  do add gaming srs "metacube-$(echo "$m" | tr '/' '-')" "$META_RAW/$m"; done
+  for r in "${ANTI403_CHOCO[@]}"; do add anti403 srs "$r" "$CHOCO_RAW/$r.srs"; done
+fi
 ok "$n_direct رول ایرانی + $(( ${#FOREIGN_SITES[@]} + ${#FOREIGN_IPS[@]} )) لیست کنترل خارجی + $(grep -Ec '^(block|threat)' "$QUEUE") لیست مسدودسازی"
 
 log "۲) دانلود موازی ($(wc -l < "$QUEUE" | tr -d ' ') فایل) ..."
@@ -738,6 +831,31 @@ if mode in ("all", "direct"):
             sample = ", ".join(sorted(report[k])[:6])
             say(f"  ✂ {k[8:]}: {fa(len(report[k]))}   ({sample}{' …' if len(report[k]) > 6 else ''})")
 
+if mode == "all":
+    # 1. Gaming
+    gaming_ds = DS()
+    for name, ds in G.get("gaming", {}).items():
+        gaming_ds.suf.update(ds.suf)
+        gaming_ds.dom.update(ds.dom)
+    extra_gaming = os.environ.get("EXTRA_GAMING", "").split()
+    gaming_ds.suf.update(extra_gaming)
+    reduce_ds(gaming_ds)
+    emit(os.path.join(outdir, "geosite-gaming.json"), plain_rules(gaming_ds, []))
+    say(f"gaming: دامنه {fa(len(gaming_ds.suf) + len(gaming_ds.dom))}")
+
+    # 2. Anti-403 (Sanctioned)
+    anti_ds = DS()
+    for g_name in ("anti403", "foreign"):
+        for name, ds in G.get(g_name, {}).items():
+            if g_name == "anti403" or "sanctioned" in name:
+                anti_ds.suf.update(ds.suf)
+                anti_ds.dom.update(ds.dom)
+    extra_anti = os.environ.get("EXTRA_ANTI_403", "").split()
+    anti_ds.suf.update(extra_anti)
+    reduce_ds(anti_ds)
+    emit(os.path.join(outdir, "geosite-anti-403.json"), plain_rules(anti_ds, []))
+    say(f"anti-403: دامنه {fa(len(anti_ds.suf) + len(anti_ds.dom))}")
+
 if REPORT:
     with open(os.path.join(outdir, "report.txt"), "w", encoding="utf-8") as fh:
         for k in sorted(report):
@@ -747,6 +865,7 @@ PYEOF
 
 log "۳) بررسی، پاک‌سازی و ادغام ..."
 STRICT="$STRICT" REPORT="$REPORT" WITH_IPV6="$WITH_IPV6" RS_VERSION="$RS_VERSION" \
+EXTRA_GAMING="${EXTRA_GAMING[*]}" EXTRA_ANTI_403="${EXTRA_ANTI_403[*]}" \
 DENY_DIRECT="${DENY_DIRECT[*]}" KEEP_DIRECT="${KEEP_DIRECT[*]}" EXTRA_BLOCK="${EXTRA_BLOCK[*]}" EXTRA_DIRECT="${EXTRA_DIRECT[*]}" \
 NEVER_BLOCK="${NEVER_BLOCK[*]}" NEVER_BLOCK_EXACT="${NEVER_BLOCK_EXACT[*]}" \
 FOREIGN_STATIC_IPS="${FOREIGN_STATIC_IPS[*]}" CRITICAL_CATEGORIES="$CRITICAL_CATEGORIES" \
@@ -789,6 +908,21 @@ if [ "$MODE" != "direct" ]; then
     digikala.com shaparak.ir bankmellat.ir mihanblog.com mcinext.com google.com \
     googletagmanager.com graph.instagram.com instagram.com
   publish block-ips ads-merged-ips
+fi
+if [ "$MODE" = "all" ]; then
+  publish geosite-gaming geosite-gaming
+  test_set "$OUT_DIR/geosite-gaming.srs" "→ gaming ✓" "→ gaming نمی‌شود" \
+    store.steampowered.com playvalorant.com discord.gg apex.respawn.com fortnite.com google.com
+  publish geosite-anti-403 geosite-anti-403
+  test_set "$OUT_DIR/geosite-anti-403.srs" "→ anti-403 ✓" "→ anti-403 نمی‌شود" \
+    hub.docker.com chatgpt.com api.openai.com developer.nvidia.com claude.ai spotify.com google.com
+
+  # همگام‌سازی فایل‌ها در پوشه rule-set-geosite
+  mkdir -p "$OUT_DIR/rule-set-geosite" 2>/dev/null || true
+  cp -f "$OUT_DIR/geosite-gaming.srs" "$OUT_DIR/geosite-gaming.json" "$OUT_DIR/geosite-anti-403.srs" "$OUT_DIR/geosite-anti-403.json" "$OUT_DIR/rule-set-geosite/" 2>/dev/null || true
+  if [ -d "$(dirname "$OUT_DIR")/rule-set-geosite" ]; then
+    cp -f "$OUT_DIR/geosite-gaming.srs" "$OUT_DIR/geosite-gaming.json" "$OUT_DIR/geosite-anti-403.srs" "$OUT_DIR/geosite-anti-403.json" "$(dirname "$OUT_DIR")/rule-set-geosite/" 2>/dev/null || true
+  fi
 fi
 
 # ----------------------- ۵) بررسی نهایی فایل‌های خروجی -----------------------
@@ -834,23 +968,31 @@ if [ "$MODE" != "direct" ]; then
   verify_srs "$OUT_DIR/ads-merged-domains.srs" ads-domains || VERIFY_FAIL=1
   verify_srs "$OUT_DIR/ads-merged-ips.srs"     ads-ips     || VERIFY_FAIL=1
 fi
+if [ "$MODE" = "all" ]; then
+  verify_srs "$OUT_DIR/geosite-gaming.srs"   geosite-gaming   || VERIFY_FAIL=1
+  verify_srs "$OUT_DIR/geosite-anti-403.srs" geosite-anti-403 || VERIFY_FAIL=1
+fi
 [ "$VERIFY_FAIL" -eq 0 ] && ok "همهٔ ورودی‌ها در جای درست هستند (دامنه در بخش دامنه، IP در بخش ip_cidr)" \
                          || warn "بررسی نهایی ایراد پیدا کرد؛ گزارش بالا را ببینید."
 [ "$REPORT" -eq 1 ] && cp "$TMP/report.txt" "$OUT_DIR/report.txt" && ok "گزارش: $OUT_DIR/report.txt"
 
 cat >&2 <<'EOF'
 
-  ─── در کانفیگ sing-box (ترتیب مهم است: اول ads، بعد iran) ───
+  ─── در کانفیگ sing-box (ترتیب رول‌ها: ads → gaming/anti-403 → iran) ───
   "route": {
     "rule_set": [
       { "tag": "ads-merged-domains", "type": "local", "format": "binary", "path": "ads-merged-domains.srs" },
       { "tag": "ads-merged-ips",     "type": "local", "format": "binary", "path": "ads-merged-ips.srs" },
+      { "tag": "geosite-gaming",     "type": "local", "format": "binary", "path": "geosite-gaming.srs" },
+      { "tag": "geosite-anti-403",   "type": "local", "format": "binary", "path": "geosite-anti-403.srs" },
       { "tag": "iran-all-domains",   "type": "local", "format": "binary", "path": "iran-all-domains.srs" },
       { "tag": "iran-all-ips",       "type": "local", "format": "binary", "path": "iran-all-ips.srs" }
     ],
     "rules": [
       { "action": "sniff" },
       { "rule_set": ["ads-merged-domains", "ads-merged-ips"], "action": "reject" },
+      { "rule_set": ["geosite-gaming"], "outbound": "direct" },
+      { "rule_set": ["geosite-anti-403"], "outbound": "direct" },
       { "rule_set": ["iran-all-domains", "iran-all-ips"], "outbound": "direct" }
     ],
     "final": "proxy"

@@ -1,6 +1,6 @@
 # sing-box Iran Rules
 
-چهار rule-set اختصاصی برای [sing-box](https://github.com/SagerNet/sing-box) — دامنه و IP در فایل‌های جدا:
+مجموعه rule-set‌های اختصاصی و بهینه‌سازی‌شده برای [sing-box](https://github.com/SagerNet/sing-box) — دامنه و IP در فایل‌های جدا:
 
 | فایل | کاربرد | اکشن پیشنهادی |
 |---|---|---|
@@ -8,12 +8,14 @@
 | **`iran-all-ips.srs`** | رنج IPهای ایرانی (بدون CDN/ابر خارجی و IP خصوصی) | `direct` |
 | **`ads-merged-domains.srs`** | دامنه‌های تبلیغات، ردیاب، بدافزار، فیشینگ، ماینر | `reject` |
 | **`ads-merged-ips.srs`** | IPهای بدافزار و فیشینگ | `reject` |
+| **`geosite-gaming.srs`** | بازی‌های آنلاین (Steam, Riot, EA, Blizzard, Epic Games, Discord, PSN, Xbox, ...) | `direct` یا tunnel اختصاصی |
+| **`geosite-anti-403.srs`** | سرویس‌های تحریم‌کننده کاربران ایرانی (Docker, OpenAI, Claude, Nvidia, Oracle, Dev tools, ...) | `direct` / `warp` یا tunnel اختصاصی |
 
 فایل‌ها **هر روز ساعت ۴ بامداد به وقت تهران** به‌صورت خودکار از منابع بالادستی ساخته و جایگزین می‌شوند.
 
-> ترتیب رول‌ها مهم است: **اول `ads-merged-*`، بعد `iran-all-*`.** در غیر این صورت تبلیغات ایرانی direct می‌شوند.
+> ترتیب رول‌ها مهم است: **اول `ads-merged-*`، بعد `geosite-*`، بعد `iran-all-*`.** در غیر این صورت تبلیغات ایرانی direct می‌شوند.
 
-> **تغییر از نسخهٔ ۳:** فایل‌های قدیمی `iran-all.srs` و `ads-merged.srs` (دامنه + IP در یک فایل) دیگر ساخته نمی‌شوند. کانفیگ را مطابق نمونهٔ زیر به چهار فایل جدید تغییر دهید.
+> **تغییر از نسخهٔ ۳:** فایل‌های قدیمی `iran-all.srs` و `ads-merged.srs` (دامنه + IP در یک فایل) دیگر ساخته نمی‌شوند. کانفیگ را مطابق نمونهٔ زیر به فایل‌های تفکیک‌شده جدید تغییر دهید.
 
 ---
 
@@ -40,6 +42,20 @@
         "update_interval": "1d"
       },
       {
+        "tag": "geosite-gaming",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/geosite-gaming.srs",
+        "update_interval": "1d"
+      },
+      {
+        "tag": "geosite-anti-403",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/geosite-anti-403.srs",
+        "update_interval": "1d"
+      },
+      {
         "tag": "iran-all-domains",
         "type": "remote",
         "format": "binary",
@@ -57,6 +73,8 @@
     "rules": [
       { "action": "sniff" },
       { "rule_set": ["ads-merged-domains", "ads-merged-ips"], "action": "reject" },
+      { "rule_set": ["geosite-gaming"], "outbound": "direct" },
+      { "rule_set": ["geosite-anti-403"], "outbound": "direct" },
       { "rule_set": ["iran-all-domains", "iran-all-ips"], "outbound": "direct" }
     ],
     "final": "proxy"

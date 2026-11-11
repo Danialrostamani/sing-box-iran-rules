@@ -16,6 +16,22 @@
         "update_interval": "1d"
       },
       {
+        "tag": "geosite-gaming",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/geosite-gaming.srs",
+        "download_detour": "direct",
+        "update_interval": "1d"
+      },
+      {
+        "tag": "geosite-anti-403",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Danialrostamani/sing-box-iran-rules/release/geosite-anti-403.srs",
+        "download_detour": "direct",
+        "update_interval": "1d"
+      },
+      {
         "tag": "iran-all-domains",
         "type": "remote",
         "format": "binary",
@@ -33,6 +49,8 @@
     "rules": [
       { "action": "sniff" },
       { "rule_set": ["ads-merged-domains", "ads-merged-ips"], "action": "reject" },
+      { "rule_set": ["geosite-gaming"], "outbound": "direct" },
+      { "rule_set": ["geosite-anti-403"], "outbound": "direct" },
       { "rule_set": ["iran-all-domains", "iran-all-ips"], "outbound": "direct" }
     ],
     "final": "proxy"
