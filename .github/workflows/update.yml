@@ -2,8 +2,8 @@ name: Update rule-sets
 
 on:
   schedule:
-    # هر روز ساعت ۰۳:۰۰ تهران = ۲۳:۳۰ UTC روز قبل (ایران از ۱۴۰۱ ساعت تابستانی ندارد)
-    - cron: "30 23 * * *"
+    # هر روز ساعت ۰۴:۰۰ تهران = ۰۰:۳۰ UTC (ایران از ۱۴۰۱ ساعت تابستانی ندارد)
+    - cron: "30 0 * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -65,7 +65,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # تاریخ به وقت تهران (اجرا ۲۳:۳۰ UTC است و تاریخ UTC یک روز عقب می‌افتد)
+          # تاریخ به وقت تهران (اجرا ۰۰:۳۰ UTC = ۰۴:۰۰ تهران)
           TAG=$(TZ=Asia/Tehran date +%Y%m%d)
           DATE=$(TZ=Asia/Tehran date +'%Y-%m-%d %H:%M (Tehran)')
           echo "TAG=$TAG" >> "$GITHUB_ENV"
@@ -106,12 +106,13 @@ jobs:
           ASSETS=""
           for f in $FILES report.txt SHA256SUMS; do ASSETS="$ASSETS dist/$f"; done
           gh release create "$TAG" $ASSETS \
+            --target release \
             --title "Rule-sets $TAG" \
             --notes "$NOTES" \
             --latest
           # فقط آخرین KEEP_RELEASES نسخهٔ روزانه (تگ‌های ۸ رقمی) نگه داشته می‌شوند
-          gh release list --limit 200 --json tagName,createdAt \
-            -q "[.[] | select(.tagName | test(\"^[0-9]{8}\$\"))] | sort_by(.createdAt) | reverse | .[${KEEP_RELEASES}:] | .[].tagName" \
+          gh release list --limit 200 --json tagName \
+            -q "[.[] | select(.tagName | test(\"^[0-9]{8}\$\"))] | sort_by(.tagName) | reverse | .[${KEEP_RELEASES}:] | .[].tagName" \
             | while read -r t; do
                 [ -n "$t" ] && gh release delete "$t" -y --cleanup-tag || true
               done
