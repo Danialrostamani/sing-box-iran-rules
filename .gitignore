@@ -1,6 +1,7 @@
 dist/
 tmp/
 *.srs
+!rule-set-geosite/*.srs
 *.srs.sha256
 iran-all-*.json
 ads-merged-*.json
